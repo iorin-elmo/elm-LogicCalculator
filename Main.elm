@@ -1,8 +1,8 @@
 module Main exposing (..)
 
 import Browser
-import Html exposing (Html, button, div, text, input, br)
-import Html.Attributes exposing (type_, value)
+import Html exposing (Html, button, div, text, input, br, span)
+import Html.Attributes exposing (type_, value, checked)
 import Html.Events exposing (onClick, onInput)
 import IorinParser exposing (..)
 
@@ -12,20 +12,21 @@ import Debug exposing (log)
 
 type Msg
   = Input String
+  | Check Char
   | Pressed String
 
 type alias Model =
   { inputStr : String
   , result : Res LogExp
   , evalResult : Maybe Bool
-  , tfDict : Dict Char Bool
+  , varList : List (Char, Bool)
   }
 
 initialModel =
   { inputStr = ""
   , result = Failed
   , evalResult = Nothing
-  , tfDict = Dict.empty
+  , varList = []
   }
 
 -- ⇒ imp (implies)
@@ -49,15 +50,15 @@ zeroOrMoreSpaceParser =
 
 tfOrVarOrParen =
   choice
-    [(lazy (\()-> parenParser))
-    ,(lazy (\()-> notParser))
-    ,boolParser
-    ,varParser
+    [ (lazy (\()-> parenParser))
+    , (lazy (\()-> notParser))
+    , boolParser
+    , varParser
     ] 
 
 parenParser : Parser LogExp
 parenParser =
-  intersperceConcat3 zeroOrMoreSpaceParser
+  intersperseConcat3 zeroOrMoreSpaceParser
   openParen logicExpressionParser closeParen
   (\_ e _ -> e )
 
@@ -73,12 +74,12 @@ boolParser =
     ((charMatch '⊥') |> map (always (Boolean False)))
 
 notParser =
-  intersperceConcat zeroOrMoreSpaceParser
+  intersperseConcat zeroOrMoreSpaceParser
   pNot tfOrVarOrParen
   (\pnot e -> pnot e)
 
 andAndtfOrVarOrParen =
-  intersperceConcat zeroOrMoreSpaceParser
+  intersperseConcat zeroOrMoreSpaceParser
   pAnd tfOrVarOrParen
   (\pand n -> (\left -> pand left n))
 
@@ -99,7 +100,7 @@ andParser =
     )
 
 orAndandNot =
-  intersperceConcat zeroOrMoreSpaceParser
+  intersperseConcat zeroOrMoreSpaceParser
   pOr andParser
   (\por a -> (\left -> por left a))
 
@@ -120,7 +121,7 @@ orParser =
     )
 
 impAndorAndNot =
-  intersperceConcat zeroOrMoreSpaceParser
+  intersperseConcat zeroOrMoreSpaceParser
   pImp orParser
   (\pimp o -> (\left -> pimp left o))
 
@@ -141,7 +142,7 @@ impParser =
     )
 
 all =
-  intersperceConcat zeroOrMoreSpaceParser
+  intersperseConcat zeroOrMoreSpaceParser
   pIff impParser
   (\piff a -> (\left -> piff left a))
 
@@ -201,6 +202,17 @@ update : Msg -> Model -> Model
 update msg model =
   case msg of
     Input str -> {model|inputStr=str}
+    Check c ->
+      { model |
+        varList =
+          model.varList
+            |> List.map 
+              (\(char,bool)->
+                if char == c
+                then (char, not bool)
+                else (char, bool)
+              )
+      }
     Pressed str ->
       case str of
         "imp" -> {model|inputStr=model.inputStr++"⇒"}
@@ -211,15 +223,44 @@ update msg model =
         "T"   -> {model|inputStr=model.inputStr++"⊤"}
         "F"   -> {model|inputStr=model.inputStr++"⊥"}
         "parse" ->
-          { model |
-            result = model.inputStr |> logicExpressionParser
-          }
+          let
+            newModel =
+              { model |
+                result = model.inputStr |> logicExpressionParser
+              , evalResult =
+                  case model.result of
+                    Success e "" ->
+                      evaluate (Dict.fromList model.varList) e
+                        |> Just
+                    _ -> Nothing
+              }
+            updateVarList mdl vl =
+              { mdl | varList = vl }
+            getVarListFromParseResult e =
+              let
+                getVarHelper exp li =
+                  case exp of
+                    And e1 e2 -> (getVarHelper e1 li)++(getVarHelper e2 li)
+                    Or  e1 e2 -> (getVarHelper e1 li)++(getVarHelper e2 li)
+                    Imp e1 e2 -> (getVarHelper e1 li)++(getVarHelper e2 li)
+                    Iff e1 e2 -> (getVarHelper e1 li)++(getVarHelper e2 li)
+                    Not ex -> getVarHelper ex li
+                    Var c -> ( c, False ) :: li
+                    _ -> li
+              in
+                getVarHelper e []
+          in
+            case newModel.result of
+              Success e "" ->
+                getVarListFromParseResult e
+                  |> updateVarList newModel
+              _ -> newModel
         "calc" ->
           { model |
             evalResult =
               case model.result of
                 Success e "" ->
-                  evaluate model.tfDict e
+                  evaluate (Dict.fromList model.varList) e
                     |> Just
                 _ -> Nothing
           }
@@ -228,52 +269,70 @@ update msg model =
 view : Model -> Html Msg
 view model =
   div []
-    [ input
-      [ type_ "textbox"
-      , onInput Input
-      , value model.inputStr
-      ][]
-    , button
-      [ onClick <| Pressed "parse" ]
-      [ text "Parse it !" ]
-    , button
-      [ onClick <| Pressed "calc" ]
-      [ text "Calculate it !"]
-    , br[][]
-    , button
-      [ onClick <| Pressed "not" ]
-      [ text "¬" ]
-    , button
-      [ onClick <| Pressed "and" ]
-      [ text "∧" ]
-    , button
-      [ onClick <| Pressed "or"  ]
-      [ text "∨" ]
-    , button
-      [ onClick <| Pressed "imp" ]
-      [ text "⇒" ]
-    , button
-      [ onClick <| Pressed "iff" ]
-      [ text "⇔" ]
-    , button
-      [ onClick <| Pressed "T" ]
-      [ text "⊤" ]
-    , button
-      [ onClick <| Pressed "F" ]
-      [ text "⊥" ]
-    , br[][]
-    , text
-      <| case model.result of
-        Success str "" -> resultToString str
-        _ -> "Error"
-    , br[][]
-    , text
-      <| case model.evalResult of
-        Just True -> "True"
-        Just False-> "False"
-        Nothing -> "Error"
-    ]
+    <| List.append
+      [ input
+        [ type_ "textbox"
+        , onInput Input
+        , value model.inputStr
+        ][]
+      , button
+        [ onClick <| Pressed "parse" ]
+        [ text "Parse it !" ]
+      , button
+        [ onClick <| Pressed "calc" ]
+        [ text "Calculate it !"]
+      , br[][]
+      , button
+        [ onClick <| Pressed "not" ]
+        [ text "¬" ]
+      , button
+        [ onClick <| Pressed "and" ]
+        [ text "∧" ]
+      , button
+        [ onClick <| Pressed "or"  ]
+        [ text "∨" ]
+      , button
+        [ onClick <| Pressed "imp" ]
+        [ text "⇒" ]
+      , button
+        [ onClick <| Pressed "iff" ]
+        [ text "⇔" ]
+      , button
+        [ onClick <| Pressed "T" ]
+        [ text "⊤" ]
+      , button
+        [ onClick <| Pressed "F" ]
+        [ text "⊥" ]
+      , br[][]
+      , text
+        <| case model.result of
+          Success str "" -> resultToString str
+          _ -> "Error"
+      , br[][]
+      , text
+        <| case model.evalResult of
+          Just True -> "True"
+          Just False-> "False"
+          Nothing -> "Error"
+      , br[][]
+      ]
+      (varSelectBoxList model.varList)
 
+varSelectBoxList li =
+  li
+    |> List.map
+      (\( c, bool ) -> makeSelectBox c bool )
+    |> List.intersperse (text ", ")
+
+makeSelectBox c bool =
+  span []
+    [ text <| (String.fromChar c)++" : "
+    , input
+      [ type_ "checkbox"
+      , checked bool
+      , onClick <| Check c
+      ][]
+    ]
 
 main : Program () Model Msg
 main =

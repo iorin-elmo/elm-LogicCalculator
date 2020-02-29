@@ -20,10 +20,10 @@ module IorinParser exposing
   , char
   , charMatch
   , string
-  , intersperceConcat
-  , intersperceConcat3
-  , intersperceConcat4
-  , intersperceConcat5
+  , intersperseConcat
+  , intersperseConcat3
+  , intersperseConcat4
+  , intersperseConcat5
   )
 
 import Debug exposing(log)
@@ -188,23 +188,23 @@ forParser n p =
         p (forParser (n-1) p)
         (\a list -> a :: list)
 
-intersperceConcat : Parser i -> Parser a -> Parser b -> (a -> b -> c) -> Parser c
-intersperceConcat i p1 p2 f =
+intersperseConcat : Parser i -> Parser a -> Parser b -> (a -> b -> c) -> Parser c
+intersperseConcat i p1 p2 f =
   concat3
     p1 i p2
     (\a _ b -> f a b)
 
-intersperceConcat3 i p1 p2 p3 f =
+intersperseConcat3 i p1 p2 p3 f =
   concat5
     p1 i p2 i p3
     (\a _ b _ c -> f a b c)
 
-intersperceConcat4 i p1 p2 p3 p4 f =
+intersperseConcat4 i p1 p2 p3 p4 f =
   concat7
     p1 i p2 i p3 i p4
     (\a _ b _ c _ d -> f a b c d)
 
-intersperceConcat5 i p1 p2 p3 p4 p5 f =
+intersperseConcat5 i p1 p2 p3 p4 p5 f =
   concat9
     p1 i p2 i p3 i p4 i p5
     (\a _ b _ c _ d _ e -> f a b c d e)
