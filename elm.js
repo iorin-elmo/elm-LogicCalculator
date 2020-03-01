@@ -4437,7 +4437,7 @@ var elm$core$Set$toList = function (_n0) {
 	var dict = _n0.a;
 	return elm$core$Dict$keys(dict);
 };
-var author$project$Main$initialModel = {evalResult: elm$core$Maybe$Nothing, inputStr: '', result: author$project$IorinParser$Failed, varList: _List_Nil};
+var author$project$Main$initialModel = {comment: '', evalResult: elm$core$Maybe$Nothing, inputStr: '', result: author$project$IorinParser$Failed, varList: _List_Nil};
 var elm$core$Basics$False = {$: 'False'};
 var elm$core$Basics$and = _Basics_and;
 var elm$core$Basics$eq = _Utils_equal;
@@ -5140,7 +5140,6 @@ try {
 	};
 } catch ($) {
 throw 'Some top-level definitions from `Main` are causing infinite recursion:\n\n  ┌─────┐\n  │    parenParser\n  │     ↓\n  │    logicExpressionParser\n  │     ↓\n  │    logExpParser\n  │     ↓\n  │    allList\n  │     ↓\n  │    all\n  │     ↓\n  │    impParser\n  │     ↓\n  │    impAndorAndNotList\n  │     ↓\n  │    impAndorAndNot\n  │     ↓\n  │    orParser\n  │     ↓\n  │    orAndandNotList\n  │     ↓\n  │    orAndandNot\n  │     ↓\n  │    andParser\n  │     ↓\n  │    andList\n  │     ↓\n  │    andAndtfOrVarOrParen\n  │     ↓\n  │    notParser\n  │     ↓\n  │    tfOrVarOrParen\n  └─────┘\n\nThese errors are very tricky, so read https://elm-lang.org/0.19.0/halting-problem to learn how to fix it!';}
-var elm$core$Basics$append = _Utils_append;
 var elm$core$Dict$RBEmpty_elm_builtin = {$: 'RBEmpty_elm_builtin'};
 var elm$core$Dict$empty = elm$core$Dict$RBEmpty_elm_builtin;
 var elm$core$Dict$Black = {$: 'Black'};
@@ -5263,7 +5262,156 @@ var elm$core$Dict$fromList = function (assocs) {
 		elm$core$Dict$empty,
 		assocs);
 };
+var elm$core$Basics$sub = _Basics_sub;
 var elm$core$Basics$add = _Basics_add;
+var elm$core$List$length = function (xs) {
+	return A3(
+		elm$core$List$foldl,
+		F2(
+			function (_n0, i) {
+				return i + 1;
+			}),
+		0,
+		xs);
+};
+var elm$core$List$map2 = _List_map2;
+var elm$core$List$rangeHelp = F3(
+	function (lo, hi, list) {
+		rangeHelp:
+		while (true) {
+			if (_Utils_cmp(lo, hi) < 1) {
+				var $temp$lo = lo,
+					$temp$hi = hi - 1,
+					$temp$list = A2(elm$core$List$cons, hi, list);
+				lo = $temp$lo;
+				hi = $temp$hi;
+				list = $temp$list;
+				continue rangeHelp;
+			} else {
+				return list;
+			}
+		}
+	});
+var elm$core$List$range = F2(
+	function (lo, hi) {
+		return A3(elm$core$List$rangeHelp, lo, hi, _List_Nil);
+	});
+var elm$core$List$indexedMap = F2(
+	function (f, xs) {
+		return A3(
+			elm$core$List$map2,
+			f,
+			A2(
+				elm$core$List$range,
+				0,
+				elm$core$List$length(xs) - 1),
+			xs);
+	});
+var elm$core$Tuple$pair = F2(
+	function (a, b) {
+		return _Utils_Tuple2(a, b);
+	});
+var author$project$Main$zip = F2(
+	function (l1, l2) {
+		var at = F2(
+			function (n, list) {
+				return function (dict) {
+					return A2(
+						elm$core$Maybe$withDefault,
+						false,
+						A2(elm$core$Dict$get, n, dict));
+				}(
+					elm$core$Dict$fromList(
+						A2(elm$core$List$indexedMap, elm$core$Tuple$pair, list)));
+			});
+		return A2(
+			elm$core$List$indexedMap,
+			F2(
+				function (n, a) {
+					return _Utils_Tuple2(
+						a,
+						A2(at, n, l2));
+				}),
+			l1);
+	});
+var elm$core$Basics$idiv = _Basics_idiv;
+var elm$core$Basics$modBy = _Basics_modBy;
+var elm$core$Basics$pow = _Basics_pow;
+var author$project$Main$satSolver = F2(
+	function (exp, li) {
+		var makeBoolListFromInt = function (n) {
+			var helper = F2(
+				function (num, l) {
+					helper:
+					while (true) {
+						switch (num) {
+							case 0:
+								return A2(elm$core$List$cons, false, l);
+							case 1:
+								return A2(elm$core$List$cons, true, l);
+							default:
+								if (A2(elm$core$Basics$modBy, 2, num) === 1) {
+									var $temp$num = (num / 2) | 0,
+										$temp$l = A2(elm$core$List$cons, true, l);
+									num = $temp$num;
+									l = $temp$l;
+									continue helper;
+								} else {
+									var $temp$num = (num / 2) | 0,
+										$temp$l = A2(elm$core$List$cons, false, l);
+									num = $temp$num;
+									l = $temp$l;
+									continue helper;
+								}
+						}
+					}
+				});
+			return A2(helper, n, _List_Nil);
+		};
+		var makeVarListFromInt = F2(
+			function (n, l) {
+				return A2(
+					author$project$Main$zip,
+					l,
+					makeBoolListFromInt(n));
+			});
+		var satSolverHelper = F3(
+			function (n, e, l) {
+				satSolverHelper:
+				while (true) {
+					var varLi = A2(makeVarListFromInt, n, l);
+					var length = elm$core$List$length(l);
+					if (function (dict) {
+						return A2(author$project$Main$evaluate, dict, e);
+					}(
+						elm$core$Dict$fromList(varLi))) {
+						return elm$core$Maybe$Just(varLi);
+					} else {
+						if (_Utils_eq(
+							n,
+							A2(elm$core$Basics$pow, 2, length) - 1)) {
+							return elm$core$Maybe$Nothing;
+						} else {
+							var $temp$n = n + 1,
+								$temp$e = e,
+								$temp$l = l;
+							n = $temp$n;
+							e = $temp$e;
+							l = $temp$l;
+							continue satSolverHelper;
+						}
+					}
+				}
+			});
+		return A3(satSolverHelper, 0, exp, li);
+	});
+var author$project$Main$updateVarList = F2(
+	function (model, vl) {
+		return _Utils_update(
+			model,
+			{varList: vl});
+	});
+var elm$core$Basics$append = _Utils_append;
 var elm$core$Basics$gt = _Utils_gt;
 var elm$core$List$foldrHelper = F4(
 	function (fn, acc, ctr, ls) {
@@ -5334,6 +5482,64 @@ var elm$core$List$map = F2(
 			_List_Nil,
 			xs);
 	});
+var elm$core$List$any = F2(
+	function (isOkay, list) {
+		any:
+		while (true) {
+			if (!list.b) {
+				return false;
+			} else {
+				var x = list.a;
+				var xs = list.b;
+				if (isOkay(x)) {
+					return true;
+				} else {
+					var $temp$isOkay = isOkay,
+						$temp$list = xs;
+					isOkay = $temp$isOkay;
+					list = $temp$list;
+					continue any;
+				}
+			}
+		}
+	});
+var elm$core$List$member = F2(
+	function (x, xs) {
+		return A2(
+			elm$core$List$any,
+			function (a) {
+				return _Utils_eq(a, x);
+			},
+			xs);
+	});
+var elm$core$Basics$identity = function (x) {
+	return x;
+};
+var elm$core$List$sortBy = _List_sortBy;
+var elm$core$List$sort = function (xs) {
+	return A2(elm$core$List$sortBy, elm$core$Basics$identity, xs);
+};
+var elm$core$List$unzip = function (pairs) {
+	var step = F2(
+		function (_n0, _n1) {
+			var x = _n0.a;
+			var y = _n0.b;
+			var xs = _n1.a;
+			var ys = _n1.b;
+			return _Utils_Tuple2(
+				A2(elm$core$List$cons, x, xs),
+				A2(elm$core$List$cons, y, ys));
+		});
+	return A3(
+		elm$core$List$foldr,
+		step,
+		_Utils_Tuple2(_List_Nil, _List_Nil),
+		pairs);
+};
+var elm$core$Tuple$first = function (_n0) {
+	var x = _n0.a;
+	return x;
+};
 var author$project$Main$update = F2(
 	function (msg, model) {
 		switch (msg.$) {
@@ -5388,15 +5594,10 @@ var author$project$Main$update = F2(
 							model,
 							{inputStr: model.inputStr + '⊥'});
 					case 'parse':
-						var updateVarList = F2(
-							function (mdl, vl) {
-								return _Utils_update(
-									mdl,
-									{varList: vl});
-							});
 						var newModel = _Utils_update(
 							model,
 							{
+								comment: '',
 								evalResult: function () {
 									var _n5 = model.result;
 									if ((_n5.$ === 'Success') && (_n5.b === '')) {
@@ -5421,27 +5622,35 @@ var author$project$Main$update = F2(
 											case 'And':
 												var e1 = exp.a;
 												var e2 = exp.b;
-												return _Utils_ap(
-													A2(getVarHelper, e1, li),
-													A2(getVarHelper, e2, li));
+												var $temp$exp = e2,
+													$temp$li = A2(getVarHelper, e1, li);
+												exp = $temp$exp;
+												li = $temp$li;
+												continue getVarHelper;
 											case 'Or':
 												var e1 = exp.a;
 												var e2 = exp.b;
-												return _Utils_ap(
-													A2(getVarHelper, e1, li),
-													A2(getVarHelper, e2, li));
+												var $temp$exp = e2,
+													$temp$li = A2(getVarHelper, e1, li);
+												exp = $temp$exp;
+												li = $temp$li;
+												continue getVarHelper;
 											case 'Imp':
 												var e1 = exp.a;
 												var e2 = exp.b;
-												return _Utils_ap(
-													A2(getVarHelper, e1, li),
-													A2(getVarHelper, e2, li));
+												var $temp$exp = e2,
+													$temp$li = A2(getVarHelper, e1, li);
+												exp = $temp$exp;
+												li = $temp$li;
+												continue getVarHelper;
 											case 'Iff':
 												var e1 = exp.a;
 												var e2 = exp.b;
-												return _Utils_ap(
-													A2(getVarHelper, e1, li),
-													A2(getVarHelper, e2, li));
+												var $temp$exp = e2,
+													$temp$li = A2(getVarHelper, e1, li);
+												exp = $temp$exp;
+												li = $temp$li;
+												continue getVarHelper;
 											case 'Not':
 												var ex = exp.a;
 												var $temp$exp = ex,
@@ -5451,24 +5660,25 @@ var author$project$Main$update = F2(
 												continue getVarHelper;
 											case 'Var':
 												var c = exp.a;
-												return A2(
-													elm$core$List$cons,
-													_Utils_Tuple2(c, false),
-													li);
+												return A2(elm$core$List$member, c, li) ? li : A2(elm$core$List$cons, c, li);
 											default:
 												return li;
 										}
 									}
 								});
-							return A2(getVarHelper, e, _List_Nil);
+							return elm$core$List$sort(
+								A2(getVarHelper, e, _List_Nil));
 						};
 						var _n3 = newModel.result;
 						if ((_n3.$ === 'Success') && (_n3.b === '')) {
 							var e = _n3.a;
 							return A2(
-								updateVarList,
+								author$project$Main$updateVarList,
 								newModel,
-								getVarListFromParseResult(e));
+								function (li) {
+									return A2(author$project$Main$zip, li, _List_Nil);
+								}(
+									getVarListFromParseResult(e)));
 						} else {
 							return newModel;
 						}
@@ -5476,6 +5686,7 @@ var author$project$Main$update = F2(
 						return _Utils_update(
 							model,
 							{
+								comment: '',
 								evalResult: function () {
 									var _n6 = model.result;
 									if ((_n6.$ === 'Success') && (_n6.b === '')) {
@@ -5490,6 +5701,23 @@ var author$project$Main$update = F2(
 									}
 								}()
 							});
+					case 'solve':
+						var _n7 = model.result;
+						if ((_n7.$ === 'Success') && (_n7.b === '')) {
+							var e = _n7.a;
+							var charList = elm$core$List$unzip(model.varList).a;
+							var _n8 = A2(author$project$Main$satSolver, e, charList);
+							if (_n8.$ === 'Just') {
+								var list = _n8.a;
+								return A2(author$project$Main$updateVarList, model, list);
+							} else {
+								return _Utils_update(
+									model,
+									{comment: 'This LogicExp is unSAT.'});
+							}
+						} else {
+							return model;
+						}
 					default:
 						return model;
 				}
@@ -5544,9 +5772,6 @@ var elm$core$Basics$apL = F2(
 	function (f, x) {
 		return f(x);
 	});
-var elm$core$Basics$identity = function (x) {
-	return x;
-};
 var elm$core$Result$isOk = function (result) {
 	if (result.$ === 'Ok') {
 		return true;
@@ -5599,10 +5824,6 @@ var elm$core$Array$compressNodes = F2(
 			}
 		}
 	});
-var elm$core$Tuple$first = function (_n0) {
-	var x = _n0.a;
-	return x;
-};
 var elm$core$Array$treeFromBuilder = F2(
 	function (nodeList, nodeListSize) {
 		treeFromBuilder:
@@ -5625,7 +5846,6 @@ var elm$core$Basics$max = F2(
 		return (_Utils_cmp(x, y) > 0) ? x : y;
 	});
 var elm$core$Basics$mul = _Basics_mul;
-var elm$core$Basics$sub = _Basics_sub;
 var elm$core$Elm$JsArray$length = _JsArray_length;
 var elm$core$Array$builderToArray = F2(
 	function (reverseNodeList, builder) {
@@ -5650,7 +5870,6 @@ var elm$core$Array$builderToArray = F2(
 				builder.tail);
 		}
 	});
-var elm$core$Basics$idiv = _Basics_idiv;
 var elm$core$Basics$lt = _Utils_lt;
 var elm$core$Elm$JsArray$initialize = _JsArray_initialize;
 var elm$core$Array$initializeHelp = F5(
@@ -5719,49 +5938,6 @@ var elm$core$Char$isDigit = function (_char) {
 var elm$core$Char$isAlphaNum = function (_char) {
 	return elm$core$Char$isLower(_char) || (elm$core$Char$isUpper(_char) || elm$core$Char$isDigit(_char));
 };
-var elm$core$List$length = function (xs) {
-	return A3(
-		elm$core$List$foldl,
-		F2(
-			function (_n0, i) {
-				return i + 1;
-			}),
-		0,
-		xs);
-};
-var elm$core$List$map2 = _List_map2;
-var elm$core$List$rangeHelp = F3(
-	function (lo, hi, list) {
-		rangeHelp:
-		while (true) {
-			if (_Utils_cmp(lo, hi) < 1) {
-				var $temp$lo = lo,
-					$temp$hi = hi - 1,
-					$temp$list = A2(elm$core$List$cons, hi, list);
-				lo = $temp$lo;
-				hi = $temp$hi;
-				list = $temp$list;
-				continue rangeHelp;
-			} else {
-				return list;
-			}
-		}
-	});
-var elm$core$List$range = F2(
-	function (lo, hi) {
-		return A3(elm$core$List$rangeHelp, lo, hi, _List_Nil);
-	});
-var elm$core$List$indexedMap = F2(
-	function (f, xs) {
-		return A3(
-			elm$core$List$map2,
-			f,
-			A2(
-				elm$core$List$range,
-				0,
-				elm$core$List$length(xs) - 1),
-			xs);
-	});
 var elm$core$String$all = _String_all;
 var elm$core$String$fromInt = _String_fromNumber;
 var elm$core$String$join = F2(
@@ -6076,6 +6252,17 @@ var author$project$Main$view = function (model) {
 						[
 							elm$html$Html$text('Calculate it !')
 						])),
+					A2(
+					elm$html$Html$button,
+					_List_fromArray(
+						[
+							elm$html$Html$Events$onClick(
+							author$project$Main$Pressed('solve'))
+						]),
+					_List_fromArray(
+						[
+							elm$html$Html$text('Solve it !')
+						])),
 					A2(elm$html$Html$br, _List_Nil, _List_Nil),
 					A2(
 					elm$html$Html$button,
@@ -6179,6 +6366,8 @@ var author$project$Main$view = function (model) {
 							return 'Error';
 						}
 					}()),
+					A2(elm$html$Html$br, _List_Nil, _List_Nil),
+					elm$html$Html$text(model.comment),
 					A2(elm$html$Html$br, _List_Nil, _List_Nil)
 				]),
 			author$project$Main$varSelectBoxList(model.varList)));
