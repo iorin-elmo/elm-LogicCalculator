@@ -20,6 +20,7 @@ type alias Model =
   , result : Res LogExp
   , evalResult : Maybe Bool
   , varList : List (Char, Bool)
+  , comment : String
   }
 
 initialModel =
@@ -27,6 +28,7 @@ initialModel =
   , result = Failed
   , evalResult = Nothing
   , varList = []
+  , comment = ""
   }
 
 -- ⇒ imp (implies)
@@ -175,6 +177,68 @@ pOr  = charMatch '∨' |> map (always Or )
 pImp = charMatch '⇒' |> map (always Imp)
 pIff = charMatch '⇔' |> map (always Iff)
 
+satSolver : LogExp -> List Char -> Maybe (List (Char, Bool))
+satSolver exp li =
+  let
+    makeBoolListFromInt : Int -> List Bool
+    makeBoolListFromInt n =
+      let
+        helper : Int -> List Bool -> List Bool
+        helper num l =
+          case num of
+            0 -> False :: l
+            1 -> True  :: l
+            _ ->
+              if modBy 2 num == 1
+              then helper (num//2) (True ::l)
+              else helper (num//2) (False::l)
+      in
+        helper n []
+
+    makeVarListFromInt : Int -> List Char -> List (Char, Bool)
+    makeVarListFromInt n l =
+      makeBoolListFromInt n
+        |> zip l
+
+    satSolverHelper : Int -> LogExp -> List Char -> Maybe (List (Char, Bool))
+    satSolverHelper n e l =
+      let
+        varLi = makeVarListFromInt n l
+        length = List.length l
+      in
+        if
+          varLi
+            |> Dict.fromList
+            |> (\dict -> evaluate dict e)
+        then
+          Just varLi
+        else
+          if n == (2 ^ length) - 1
+          then Nothing
+          else
+            satSolverHelper (n+1) e l
+  in
+    satSolverHelper 0 exp li
+
+zip : List a -> List Bool -> List (a, Bool)
+zip l1 l2 =
+  let
+    at : Int -> List Bool -> Bool
+    at n list =
+      list
+        |> List.indexedMap Tuple.pair
+        |> Dict.fromList
+        |>
+          (\dict ->
+            (Maybe.withDefault False
+              (Dict.get n dict)
+            )
+          )
+  in
+    l1
+      |> List.indexedMap
+        (\n a -> ( a, at n l2 ))
+
 evaluate : Dict Char Bool -> LogExp -> Bool
 evaluate dict logExp =
   case logExp of
@@ -197,6 +261,9 @@ resultToString logExp =
     Iff e1 e2 -> "(Iff "++resultToString e1++", "++resultToString e2++" )"
     Boolean True -> "True"
     Boolean False-> "False"
+
+updateVarList model vl =
+  { model | varList = vl }
 
 update : Msg -> Model -> Model
 update msg model =
@@ -233,26 +300,32 @@ update msg model =
                       evaluate (Dict.fromList model.varList) e
                         |> Just
                     _ -> Nothing
+              , comment = ""
               }
-            updateVarList mdl vl =
-              { mdl | varList = vl }
             getVarListFromParseResult e =
               let
                 getVarHelper exp li =
                   case exp of
-                    And e1 e2 -> (getVarHelper e1 li)++(getVarHelper e2 li)
-                    Or  e1 e2 -> (getVarHelper e1 li)++(getVarHelper e2 li)
-                    Imp e1 e2 -> (getVarHelper e1 li)++(getVarHelper e2 li)
-                    Iff e1 e2 -> (getVarHelper e1 li)++(getVarHelper e2 li)
+                    And e1 e2 -> getVarHelper e2 (getVarHelper e1 li)
+                    Or  e1 e2 -> getVarHelper e2 (getVarHelper e1 li)
+                    Imp e1 e2 -> getVarHelper e2 (getVarHelper e1 li)
+                    Iff e1 e2 -> getVarHelper e2 (getVarHelper e1 li)
                     Not ex -> getVarHelper ex li
-                    Var c -> ( c, False ) :: li
+                    Var c ->
+                      if List.member c li
+                      then
+                        li
+                      else
+                        c :: li
                     _ -> li
               in
                 getVarHelper e []
+                  |> List.sort
           in
             case newModel.result of
               Success e "" ->
                 getVarListFromParseResult e
+                  |> (\li -> zip li [])
                   |> updateVarList newModel
               _ -> newModel
         "calc" ->
@@ -263,7 +336,21 @@ update msg model =
                   evaluate (Dict.fromList model.varList) e
                     |> Just
                 _ -> Nothing
+          , comment = ""
           }
+        "solve" ->
+          case model.result of
+            Success e "" ->
+              let
+                charList =
+                  model.varList
+                    |> List.unzip
+                    |> Tuple.first
+              in
+                case satSolver e charList of
+                  Just list -> updateVarList model list
+                  Nothing -> { model | comment = "This LogicExp is unSAT." }
+            _ -> model
         _ -> model
 
 view : Model -> Html Msg
@@ -280,7 +367,10 @@ view model =
         [ text "Parse it !" ]
       , button
         [ onClick <| Pressed "calc" ]
-        [ text "Calculate it !"]
+        [ text "Calculate it !" ]
+      , button
+        [ onClick <| Pressed "solve" ]
+        [ text "Solve it !" ]
       , br[][]
       , button
         [ onClick <| Pressed "not" ]
@@ -314,6 +404,8 @@ view model =
           Just True -> "True"
           Just False-> "False"
           Nothing -> "Error"
+      , br[][]
+      , text model.comment
       , br[][]
       ]
       (varSelectBoxList model.varList)
