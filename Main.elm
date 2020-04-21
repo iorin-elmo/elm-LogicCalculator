@@ -195,13 +195,16 @@ update msg model =
         "F"   -> {model|inputStr=model.inputStr++"⊥"}
         "parse" ->
           let
-            newModel =
+            newExpModel =
               { model |
                 result = model.inputStr |> logicExpressionParser
-              , evalResult =
-                  case model.result of
+              }
+            newResModel =
+              { newExpModel |
+                evalResult =
+                  case newExpModel.result of
                     Success e "" ->
-                      evaluate (Dict.fromList model.varList) e
+                      evaluate (Dict.fromList newExpModel.varList) e
                         |> Just
                     _ -> Nothing
               , comment = ""
@@ -226,12 +229,12 @@ update msg model =
                 getVarHelper e []
                   |> List.sort
           in
-            case newModel.result of
+            case newResModel.result of
               Success e "" ->
                 getVarListFromParseResult e
                   |> List.map (\c->(c,False))
-                  |> updateVarList newModel
-              _ -> updateVarList newModel []
+                  |> updateVarList newResModel
+              _ -> updateVarList newResModel []
         "calc" ->
           { model |
             evalResult =
@@ -264,7 +267,6 @@ update msg model =
                         evaluate (Dict.fromList newModel.varList) exp
                           |> Just
                       _ -> Nothing
-                , comment = ""
                 }
             _ -> model
         _ -> model
