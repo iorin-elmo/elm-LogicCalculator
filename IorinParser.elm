@@ -24,6 +24,9 @@ module IorinParser exposing
   , intersperseConcat3
   , intersperseConcat4
   , intersperseConcat5
+  , foldl
+  , foldr
+  , pLog
   )
 
 import Debug exposing(log)
@@ -81,25 +84,24 @@ or p1 p2 =
           Success hd tl -> Success hd tl
           _ -> Failed
   )
+  |> pLog "or"
 
 unitOr : (() -> Parser a) -> Parser a -> Parser a
 unitOr up p =
-  (\str ->
-    case up () str of
-      Success hd tl -> Success hd tl
-      _ ->
-        case p str of
-          Success hd tl -> Success hd tl
-          _ -> Failed
-  )
+  or
+    (lazy up)
+    p
 
 choice : List (Parser a) -> Parser a
 choice list =
-  List.foldl or fail list
 
-unitChoice : (() -> Parser a) -> List (Parser a) -> Parser a
-unitChoice p list =
-  unitOr p (choice list)
+  List.foldr or fail list
+-- choice [return "A",return "B",return "C"]
+-- or fail (or return "A" or (return "B" return "C"))
+
+unitChoice : List (() -> Parser a) -> Parser a
+unitChoice pList =
+  choice (pList |> List.map lazy)
 
 zeroOrMore : Parser a -> Parser (List a)
 zeroOrMore p =
@@ -129,6 +131,7 @@ map : (a -> b) -> Parser a -> Parser b
 map f pa =
   pa
     |> fmap (\a -> return (f a))
+    |> pLog "map"
 
 fmap : (a -> Parser b) -> Parser a -> Parser b
 fmap f pa =
@@ -208,3 +211,40 @@ intersperseConcat5 i p1 p2 p3 p4 p5 f =
   concat9
     p1 i p2 i p3 i p4 i p5
     (\a _ b _ c _ d _ e -> f a b c d e)
+
+foldl : Parser (a->a->a) -> Parser a -> Parser a
+foldl pi pa =
+  concat
+  pa
+  ( zeroOrMore
+    ( concat
+      pi
+      pa
+      (\i a -> (\l -> i l a))
+    )
+  )
+  (List.foldl (<|))
+  |> pLog "foldl"
+
+
+foldr : Parser (a->a->a) -> Parser a -> Parser a
+foldr pi pa =
+  concat
+  ( zeroOrMore
+    ( concat
+      pa
+      pi
+      (\a i -> (a,i))
+    )
+  )
+  pa
+  (\l a ->
+    List.foldr
+      (\(al,i) ar -> i al ar)
+      a l
+  )
+  |> pLog "foldr"
+
+pLog : String -> Parser a -> Parser a
+pLog s pa =
+  \str -> pa str |> log s

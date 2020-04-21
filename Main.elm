@@ -80,90 +80,42 @@ notParser =
   pNot tfOrVarOrParen
   (\pnot e -> pnot e)
 
-andAndtfOrVarOrParen =
-  intersperseConcat zeroOrMoreSpaceParser
-  pAnd tfOrVarOrParen
-  (\pand n -> (\left -> pand left n))
-
-andList =
-  zeroOrMore
-    (concat
-      zeroOrMoreSpaceParser
-      andAndtfOrVarOrParen
-      (\_ e -> e)
-    )
-
 andParser =
-  concat
-    tfOrVarOrParen andList
-    (\left list ->
-      list
-        |> List.foldl (\e l -> e l) left
+  foldl
+    ( concat
+        zeroOrMoreSpaceParser
+        pAnd
+        (\_ x -> x)
     )
-
-orAndandNot =
-  intersperseConcat zeroOrMoreSpaceParser
-  pOr andParser
-  (\por a -> (\left -> por left a))
-
-orAndandNotList =
-  zeroOrMore
-    (concat
-      zeroOrMoreSpaceParser
-      orAndandNot
-      (\_ e -> e)
-    )
+    tfOrVarOrParen
 
 orParser =
-  concat
-    andParser orAndandNotList
-    (\left list ->
-      list
-        |> List.foldl (\e l -> e l) left
+  foldl
+    ( concat
+        zeroOrMoreSpaceParser
+        pOr
+        (\_ x -> x)
     )
-
-impAndorAndNot =
-  intersperseConcat zeroOrMoreSpaceParser
-  pImp orParser
-  (\pimp o -> (\left -> pimp left o))
-
-impAndorAndNotList =
-  zeroOrMore
-    (concat
-      zeroOrMoreSpaceParser
-      impAndorAndNot
-      (\_ e -> e)
-    )
+    andParser
 
 impParser =
-  concat
-    orParser impAndorAndNotList
-    (\left list ->
-      list
-        |> List.foldl (\e l -> e l) left
+  foldl
+    ( concat
+        zeroOrMoreSpaceParser
+        pImp
+        (\_ x -> x)
     )
-
-all =
-  intersperseConcat zeroOrMoreSpaceParser
-  pIff impParser
-  (\piff a -> (\left -> piff left a))
-
-allList =
-  zeroOrMore
-    (concat
-      zeroOrMoreSpaceParser
-      all
-      (\_ e -> e)
-    )
+    orParser
 
 logExpParser : Parser LogExp
 logExpParser =
-  concat
-    impParser allList
-    (\left list ->
-      list
-        |> List.foldl (\e l -> e l) left
+  foldl
+    ( concat
+        zeroOrMoreSpaceParser
+        pIff
+        (\_ x -> x)
     )
+    impParser
 
 logicExpressionParser : Parser LogExp
 logicExpressionParser =
@@ -177,67 +129,19 @@ pOr  = charMatch '∨' |> map (always Or )
 pImp = charMatch '⇒' |> map (always Imp)
 pIff = charMatch '⇔' |> map (always Iff)
 
-satSolver : LogExp -> List Char -> Maybe (List (Char, Bool))
-satSolver exp li =
-  let
-    makeBoolListFromInt : Int -> List Bool
-    makeBoolListFromInt n =
-      let
-        helper : Int -> List Bool -> List Bool
-        helper num l =
-          case num of
-            0 -> False :: l
-            1 -> True  :: l
-            _ ->
-              if modBy 2 num == 1
-              then helper (num//2) (True ::l)
-              else helper (num//2) (False::l)
-      in
-        helper n []
-
-    makeVarListFromInt : Int -> List Char -> List (Char, Bool)
-    makeVarListFromInt n l =
-      makeBoolListFromInt n
-        |> zip l
-
-    satSolverHelper : Int -> LogExp -> List Char -> Maybe (List (Char, Bool))
-    satSolverHelper n e l =
-      let
-        varLi = makeVarListFromInt n l
-        length = List.length l
-      in
-        if
-          varLi
-            |> Dict.fromList
-            |> (\dict -> evaluate dict e)
-        then
-          Just varLi
-        else
-          if n == (2 ^ length) - 1
-          then Nothing
-          else
-            satSolverHelper (n+1) e l
-  in
-    satSolverHelper 0 exp li
-
-zip : List a -> List Bool -> List (a, Bool)
-zip l1 l2 =
-  let
-    at : Int -> List Bool -> Bool
-    at n list =
-      list
-        |> List.indexedMap Tuple.pair
-        |> Dict.fromList
-        |>
-          (\dict ->
-            (Maybe.withDefault False
-              (Dict.get n dict)
-            )
-          )
-  in
-    l1
-      |> List.indexedMap
-        (\n a -> ( a, at n l2 ))
+search : LogExp -> List (Char, Bool) -> List Char -> Maybe (List (Char, Bool))
+search exp result rest =
+  case rest of
+    [] ->
+      if evaluate (Dict.fromList result) exp
+      then Just result
+      else Nothing
+    hd :: tl ->
+      case search exp ((hd, True) :: result) tl of
+        Just result_ ->
+          Just result_
+        Nothing ->
+          search exp ((hd, False) :: result) tl
 
 evaluate : Dict Char Bool -> LogExp -> Bool
 evaluate dict logExp =
@@ -325,9 +229,9 @@ update msg model =
             case newModel.result of
               Success e "" ->
                 getVarListFromParseResult e
-                  |> (\li -> zip li [])
+                  |> List.map (\c->(c,False))
                   |> updateVarList newModel
-              _ -> newModel
+              _ -> updateVarList newModel []
         "calc" ->
           { model |
             evalResult =
@@ -342,14 +246,26 @@ update msg model =
           case model.result of
             Success e "" ->
               let
-                charList =
-                  model.varList
-                    |> List.unzip
-                    |> Tuple.first
+                newModel = 
+                  let
+                    charList =
+                      model.varList
+                        |> List.unzip
+                        |> Tuple.first
+                  in
+                    case search e [] (List.reverse charList) of
+                      Just list -> updateVarList model list
+                      Nothing -> { model | comment = "This LogicExp is unSAT." }
               in
-                case satSolver e charList of
-                  Just list -> updateVarList model list
-                  Nothing -> { model | comment = "This LogicExp is unSAT." }
+                { newModel | 
+                  evalResult =
+                    case model.result of
+                      Success exp "" ->
+                        evaluate (Dict.fromList newModel.varList) exp
+                          |> Just
+                      _ -> Nothing
+                , comment = ""
+                }
             _ -> model
         _ -> model
 
