@@ -5403,6 +5403,16 @@ var $author$project$IorinParser$fmap = F2(
 			}
 		};
 	});
+var $elm$core$Debug$log = _Debug_log;
+var $author$project$IorinParser$pLog = F2(
+	function (s, pa) {
+		return function (str) {
+			return A2(
+				$elm$core$Debug$log,
+				s,
+				pa(str));
+		};
+	});
 var $author$project$IorinParser$return = function (a) {
 	return function (str) {
 		return A2($author$project$IorinParser$Success, a, str);
@@ -5411,12 +5421,15 @@ var $author$project$IorinParser$return = function (a) {
 var $author$project$IorinParser$map = F2(
 	function (f, pa) {
 		return A2(
-			$author$project$IorinParser$fmap,
-			function (a) {
-				return $author$project$IorinParser$return(
-					f(a));
-			},
-			pa);
+			$author$project$IorinParser$pLog,
+			'map',
+			A2(
+				$author$project$IorinParser$fmap,
+				function (a) {
+					return $author$project$IorinParser$return(
+						f(a));
+				},
+				pa));
 	});
 var $author$project$IorinParser$charMatch = function (c) {
 	return A2(
@@ -5427,23 +5440,26 @@ var $author$project$IorinParser$charMatch = function (c) {
 };
 var $author$project$IorinParser$or = F2(
 	function (p1, p2) {
-		return function (str) {
-			var _v0 = p1(str);
-			if (_v0.$ === 'Success') {
-				var hd = _v0.a;
-				var tl = _v0.b;
-				return A2($author$project$IorinParser$Success, hd, tl);
-			} else {
-				var _v1 = p2(str);
-				if (_v1.$ === 'Success') {
-					var hd = _v1.a;
-					var tl = _v1.b;
+		return A2(
+			$author$project$IorinParser$pLog,
+			'or',
+			function (str) {
+				var _v0 = p1(str);
+				if (_v0.$ === 'Success') {
+					var hd = _v0.a;
+					var tl = _v0.b;
 					return A2($author$project$IorinParser$Success, hd, tl);
 				} else {
-					return $author$project$IorinParser$Failed;
+					var _v1 = p2(str);
+					if (_v1.$ === 'Success') {
+						var hd = _v1.a;
+						var tl = _v1.b;
+						return A2($author$project$IorinParser$Success, hd, tl);
+					} else {
+						return $author$project$IorinParser$Failed;
+					}
 				}
-			}
-		};
+			});
 	});
 var $author$project$Main$boolParser = A2(
 	$author$project$IorinParser$or,
@@ -5459,12 +5475,11 @@ var $author$project$Main$boolParser = A2(
 			$author$project$Main$Boolean(false)),
 		$author$project$IorinParser$charMatch(
 			_Utils_chr('⊥'))));
-var $elm$core$Debug$log = _Debug_log;
 var $author$project$IorinParser$fail = function (str) {
 	return A2($elm$core$Debug$log, str, $author$project$IorinParser$Failed);
 };
 var $author$project$IorinParser$choice = function (list) {
-	return A3($elm$core$List$foldl, $author$project$IorinParser$or, $author$project$IorinParser$fail, list);
+	return A3($elm$core$List$foldr, $author$project$IorinParser$or, $author$project$IorinParser$fail, list);
 };
 var $author$project$Main$closeParen = A2(
 	$author$project$IorinParser$map,
@@ -5483,6 +5498,74 @@ var $author$project$IorinParser$concat = F3(
 					pb);
 			},
 			pa);
+	});
+var $author$project$IorinParser$oneOrMore = function (p) {
+	var parseHelper = F2(
+		function (list, str) {
+			parseHelper:
+			while (true) {
+				var _v0 = p(str);
+				if (_v0.$ === 'Success') {
+					var hd = _v0.a;
+					var tl = _v0.b;
+					var $temp$list = A2($elm$core$List$cons, hd, list),
+						$temp$str = tl;
+					list = $temp$list;
+					str = $temp$str;
+					continue parseHelper;
+				} else {
+					return A2(
+						$author$project$IorinParser$Success,
+						$elm$core$List$reverse(list),
+						str);
+				}
+			}
+		});
+	return function (str) {
+		var _v1 = p(str);
+		if (_v1.$ === 'Success') {
+			var hd = _v1.a;
+			var tl = _v1.b;
+			return A2(
+				parseHelper,
+				_List_fromArray(
+					[hd]),
+				tl);
+		} else {
+			return $author$project$IorinParser$Failed;
+		}
+	};
+};
+var $author$project$IorinParser$zero = $author$project$IorinParser$return(_Utils_Tuple0);
+var $author$project$IorinParser$zeroOrMore = function (p) {
+	return A2(
+		$author$project$IorinParser$or,
+		$author$project$IorinParser$oneOrMore(p),
+		A2(
+			$author$project$IorinParser$map,
+			$elm$core$Basics$always(_List_Nil),
+			$author$project$IorinParser$zero));
+};
+var $author$project$IorinParser$foldl = F2(
+	function (pi, pa) {
+		return A2(
+			$author$project$IorinParser$pLog,
+			'foldl',
+			A3(
+				$author$project$IorinParser$concat,
+				pa,
+				$author$project$IorinParser$zeroOrMore(
+					A3(
+						$author$project$IorinParser$concat,
+						pi,
+						pa,
+						F2(
+							function (i, a) {
+								return function (l) {
+									return A2(i, l, a);
+								};
+							}))),
+				$elm$core$List$foldl($elm$core$Basics$apL)));
 	});
 var $author$project$IorinParser$concat3 = F4(
 	function (pa, pb, pc, f) {
@@ -5617,53 +5700,6 @@ var $author$project$Main$varParser = A2(
 		return $author$project$Main$Var(c);
 	},
 	$author$project$IorinParser$char($elm$core$Char$isAlpha));
-var $author$project$IorinParser$oneOrMore = function (p) {
-	var parseHelper = F2(
-		function (list, str) {
-			parseHelper:
-			while (true) {
-				var _v0 = p(str);
-				if (_v0.$ === 'Success') {
-					var hd = _v0.a;
-					var tl = _v0.b;
-					var $temp$list = A2($elm$core$List$cons, hd, list),
-						$temp$str = tl;
-					list = $temp$list;
-					str = $temp$str;
-					continue parseHelper;
-				} else {
-					return A2(
-						$author$project$IorinParser$Success,
-						$elm$core$List$reverse(list),
-						str);
-				}
-			}
-		});
-	return function (str) {
-		var _v1 = p(str);
-		if (_v1.$ === 'Success') {
-			var hd = _v1.a;
-			var tl = _v1.b;
-			return A2(
-				parseHelper,
-				_List_fromArray(
-					[hd]),
-				tl);
-		} else {
-			return $author$project$IorinParser$Failed;
-		}
-	};
-};
-var $author$project$IorinParser$zero = $author$project$IorinParser$return(_Utils_Tuple0);
-var $author$project$IorinParser$zeroOrMore = function (p) {
-	return A2(
-		$author$project$IorinParser$or,
-		$author$project$IorinParser$oneOrMore(p),
-		A2(
-			$author$project$IorinParser$map,
-			$elm$core$Basics$always(_List_Nil),
-			$author$project$IorinParser$zero));
-};
 var $author$project$Main$zeroOrMoreSpaceParser = A2(
 	$author$project$IorinParser$map,
 	$elm$core$Basics$always(_Utils_Tuple0),
@@ -5686,168 +5722,56 @@ function $author$project$Main$cyclic$logicExpressionParser() {
 	return $author$project$Main$cyclic$logExpParser();
 }
 function $author$project$Main$cyclic$logExpParser() {
-	return A3(
-		$author$project$IorinParser$concat,
-		$author$project$Main$cyclic$impParser(),
-		$author$project$Main$cyclic$allList(),
-		F2(
-			function (left, list) {
-				return A3(
-					$elm$core$List$foldl,
-					F2(
-						function (e, l) {
-							return e(l);
-						}),
-					left,
-					list);
-			}));
-}
-function $author$project$Main$cyclic$allList() {
-	return $author$project$IorinParser$zeroOrMore(
+	return A2(
+		$author$project$IorinParser$foldl,
 		A3(
 			$author$project$IorinParser$concat,
 			$author$project$Main$zeroOrMoreSpaceParser,
-			$author$project$Main$cyclic$all(),
+			$author$project$Main$pIff,
 			F2(
-				function (_v5, e) {
-					return e;
-				})));
-}
-function $author$project$Main$cyclic$all() {
-	return A4(
-		$author$project$IorinParser$intersperseConcat,
-		$author$project$Main$zeroOrMoreSpaceParser,
-		$author$project$Main$pIff,
-		$author$project$Main$cyclic$impParser(),
-		F2(
-			function (piff, a) {
-				return function (left) {
-					return A2(piff, left, a);
-				};
-			}));
+				function (_v5, x) {
+					return x;
+				})),
+		$author$project$Main$cyclic$impParser());
 }
 function $author$project$Main$cyclic$impParser() {
-	return A3(
-		$author$project$IorinParser$concat,
-		$author$project$Main$cyclic$orParser(),
-		$author$project$Main$cyclic$impAndorAndNotList(),
-		F2(
-			function (left, list) {
-				return A3(
-					$elm$core$List$foldl,
-					F2(
-						function (e, l) {
-							return e(l);
-						}),
-					left,
-					list);
-			}));
-}
-function $author$project$Main$cyclic$impAndorAndNotList() {
-	return $author$project$IorinParser$zeroOrMore(
+	return A2(
+		$author$project$IorinParser$foldl,
 		A3(
 			$author$project$IorinParser$concat,
 			$author$project$Main$zeroOrMoreSpaceParser,
-			$author$project$Main$cyclic$impAndorAndNot(),
+			$author$project$Main$pImp,
 			F2(
-				function (_v4, e) {
-					return e;
-				})));
-}
-function $author$project$Main$cyclic$impAndorAndNot() {
-	return A4(
-		$author$project$IorinParser$intersperseConcat,
-		$author$project$Main$zeroOrMoreSpaceParser,
-		$author$project$Main$pImp,
-		$author$project$Main$cyclic$orParser(),
-		F2(
-			function (pimp, o) {
-				return function (left) {
-					return A2(pimp, left, o);
-				};
-			}));
+				function (_v4, x) {
+					return x;
+				})),
+		$author$project$Main$cyclic$orParser());
 }
 function $author$project$Main$cyclic$orParser() {
-	return A3(
-		$author$project$IorinParser$concat,
-		$author$project$Main$cyclic$andParser(),
-		$author$project$Main$cyclic$orAndandNotList(),
-		F2(
-			function (left, list) {
-				return A3(
-					$elm$core$List$foldl,
-					F2(
-						function (e, l) {
-							return e(l);
-						}),
-					left,
-					list);
-			}));
-}
-function $author$project$Main$cyclic$orAndandNotList() {
-	return $author$project$IorinParser$zeroOrMore(
+	return A2(
+		$author$project$IorinParser$foldl,
 		A3(
 			$author$project$IorinParser$concat,
 			$author$project$Main$zeroOrMoreSpaceParser,
-			$author$project$Main$cyclic$orAndandNot(),
+			$author$project$Main$pOr,
 			F2(
-				function (_v3, e) {
-					return e;
-				})));
-}
-function $author$project$Main$cyclic$orAndandNot() {
-	return A4(
-		$author$project$IorinParser$intersperseConcat,
-		$author$project$Main$zeroOrMoreSpaceParser,
-		$author$project$Main$pOr,
-		$author$project$Main$cyclic$andParser(),
-		F2(
-			function (por, a) {
-				return function (left) {
-					return A2(por, left, a);
-				};
-			}));
+				function (_v3, x) {
+					return x;
+				})),
+		$author$project$Main$cyclic$andParser());
 }
 function $author$project$Main$cyclic$andParser() {
-	return A3(
-		$author$project$IorinParser$concat,
-		$author$project$Main$cyclic$tfOrVarOrParen(),
-		$author$project$Main$cyclic$andList(),
-		F2(
-			function (left, list) {
-				return A3(
-					$elm$core$List$foldl,
-					F2(
-						function (e, l) {
-							return e(l);
-						}),
-					left,
-					list);
-			}));
-}
-function $author$project$Main$cyclic$andList() {
-	return $author$project$IorinParser$zeroOrMore(
+	return A2(
+		$author$project$IorinParser$foldl,
 		A3(
 			$author$project$IorinParser$concat,
 			$author$project$Main$zeroOrMoreSpaceParser,
-			$author$project$Main$cyclic$andAndtfOrVarOrParen(),
+			$author$project$Main$pAnd,
 			F2(
-				function (_v2, e) {
-					return e;
-				})));
-}
-function $author$project$Main$cyclic$andAndtfOrVarOrParen() {
-	return A4(
-		$author$project$IorinParser$intersperseConcat,
-		$author$project$Main$zeroOrMoreSpaceParser,
-		$author$project$Main$pAnd,
-		$author$project$Main$cyclic$tfOrVarOrParen(),
-		F2(
-			function (pand, n) {
-				return function (left) {
-					return A2(pand, left, n);
-				};
-			}));
+				function (_v2, x) {
+					return x;
+				})),
+		$author$project$Main$cyclic$tfOrVarOrParen());
 }
 function $author$project$Main$cyclic$notParser() {
 	return A4(
@@ -5889,49 +5813,17 @@ try {
 	$author$project$Main$cyclic$logExpParser = function () {
 		return $author$project$Main$logExpParser;
 	};
-	var $author$project$Main$allList = $author$project$Main$cyclic$allList();
-	$author$project$Main$cyclic$allList = function () {
-		return $author$project$Main$allList;
-	};
-	var $author$project$Main$all = $author$project$Main$cyclic$all();
-	$author$project$Main$cyclic$all = function () {
-		return $author$project$Main$all;
-	};
 	var $author$project$Main$impParser = $author$project$Main$cyclic$impParser();
 	$author$project$Main$cyclic$impParser = function () {
 		return $author$project$Main$impParser;
-	};
-	var $author$project$Main$impAndorAndNotList = $author$project$Main$cyclic$impAndorAndNotList();
-	$author$project$Main$cyclic$impAndorAndNotList = function () {
-		return $author$project$Main$impAndorAndNotList;
-	};
-	var $author$project$Main$impAndorAndNot = $author$project$Main$cyclic$impAndorAndNot();
-	$author$project$Main$cyclic$impAndorAndNot = function () {
-		return $author$project$Main$impAndorAndNot;
 	};
 	var $author$project$Main$orParser = $author$project$Main$cyclic$orParser();
 	$author$project$Main$cyclic$orParser = function () {
 		return $author$project$Main$orParser;
 	};
-	var $author$project$Main$orAndandNotList = $author$project$Main$cyclic$orAndandNotList();
-	$author$project$Main$cyclic$orAndandNotList = function () {
-		return $author$project$Main$orAndandNotList;
-	};
-	var $author$project$Main$orAndandNot = $author$project$Main$cyclic$orAndandNot();
-	$author$project$Main$cyclic$orAndandNot = function () {
-		return $author$project$Main$orAndandNot;
-	};
 	var $author$project$Main$andParser = $author$project$Main$cyclic$andParser();
 	$author$project$Main$cyclic$andParser = function () {
 		return $author$project$Main$andParser;
-	};
-	var $author$project$Main$andList = $author$project$Main$cyclic$andList();
-	$author$project$Main$cyclic$andList = function () {
-		return $author$project$Main$andList;
-	};
-	var $author$project$Main$andAndtfOrVarOrParen = $author$project$Main$cyclic$andAndtfOrVarOrParen();
-	$author$project$Main$cyclic$andAndtfOrVarOrParen = function () {
-		return $author$project$Main$andAndtfOrVarOrParen;
 	};
 	var $author$project$Main$notParser = $author$project$Main$cyclic$notParser();
 	$author$project$Main$cyclic$notParser = function () {
@@ -5942,7 +5834,7 @@ try {
 		return $author$project$Main$tfOrVarOrParen;
 	};
 } catch ($) {
-	throw 'Some top-level definitions from `Main` are causing infinite recursion:\n\n  ┌─────┐\n  │    parenParser\n  │     ↓\n  │    logicExpressionParser\n  │     ↓\n  │    logExpParser\n  │     ↓\n  │    allList\n  │     ↓\n  │    all\n  │     ↓\n  │    impParser\n  │     ↓\n  │    impAndorAndNotList\n  │     ↓\n  │    impAndorAndNot\n  │     ↓\n  │    orParser\n  │     ↓\n  │    orAndandNotList\n  │     ↓\n  │    orAndandNot\n  │     ↓\n  │    andParser\n  │     ↓\n  │    andList\n  │     ↓\n  │    andAndtfOrVarOrParen\n  │     ↓\n  │    notParser\n  │     ↓\n  │    tfOrVarOrParen\n  └─────┘\n\nThese errors are very tricky, so read https://elm-lang.org/0.19.1/bad-recursion to learn how to fix it!';}
+	throw 'Some top-level definitions from `Main` are causing infinite recursion:\n\n  ┌─────┐\n  │    parenParser\n  │     ↓\n  │    logicExpressionParser\n  │     ↓\n  │    logExpParser\n  │     ↓\n  │    impParser\n  │     ↓\n  │    orParser\n  │     ↓\n  │    andParser\n  │     ↓\n  │    notParser\n  │     ↓\n  │    tfOrVarOrParen\n  └─────┘\n\nThese errors are very tricky, so read https://elm-lang.org/0.19.1/bad-recursion to learn how to fix it!';}
 var $elm$core$List$any = F2(
 	function (isOkay, list) {
 		any:
@@ -6092,24 +5984,28 @@ var $author$project$Main$update = F2(
 							model,
 							{inputStr: model.inputStr + '⊥'});
 					case 'parse':
-						var newModel = _Utils_update(
+						var newExpModel = _Utils_update(
 							model,
+							{
+								result: $author$project$Main$logicExpressionParser(model.inputStr)
+							});
+						var newResModel = _Utils_update(
+							newExpModel,
 							{
 								comment: '',
 								evalResult: function () {
-									var _v5 = model.result;
+									var _v5 = newExpModel.result;
 									if ((_v5.$ === 'Success') && (_v5.b === '')) {
 										var e = _v5.a;
 										return $elm$core$Maybe$Just(
 											A2(
 												$author$project$Main$evaluate,
-												$elm$core$Dict$fromList(model.varList),
+												$elm$core$Dict$fromList(newExpModel.varList),
 												e));
 									} else {
 										return $elm$core$Maybe$Nothing;
 									}
-								}(),
-								result: $author$project$Main$logicExpressionParser(model.inputStr)
+								}()
 							});
 						var getVarListFromParseResult = function (e) {
 							var getVarHelper = F2(
@@ -6167,12 +6063,12 @@ var $author$project$Main$update = F2(
 							return $elm$core$List$sort(
 								A2(getVarHelper, e, _List_Nil));
 						};
-						var _v3 = newModel.result;
+						var _v3 = newResModel.result;
 						if ((_v3.$ === 'Success') && (_v3.b === '')) {
 							var e = _v3.a;
 							return A2(
 								$author$project$Main$updateVarList,
-								newModel,
+								newResModel,
 								A2(
 									$elm$core$List$map,
 									function (c) {
@@ -6180,7 +6076,7 @@ var $author$project$Main$update = F2(
 									},
 									getVarListFromParseResult(e)));
 						} else {
-							return A2($author$project$Main$updateVarList, newModel, _List_Nil);
+							return A2($author$project$Main$updateVarList, newResModel, _List_Nil);
 						}
 					case 'calc':
 						return _Utils_update(
@@ -6224,7 +6120,6 @@ var $author$project$Main$update = F2(
 							return _Utils_update(
 								newModel,
 								{
-									comment: '',
 									evalResult: function () {
 										var _v8 = model.result;
 										if ((_v8.$ === 'Success') && (_v8.b === '')) {
