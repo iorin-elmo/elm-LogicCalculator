@@ -99,7 +99,7 @@ orParser =
     andParser
 
 impParser =
-  foldl
+  foldr
     ( concat
         zeroOrMoreSpaceParser
         pImp
