@@ -5567,6 +5567,37 @@ var $author$project$IorinParser$foldl = F2(
 							}))),
 				$elm$core$List$foldl($elm$core$Basics$apL)));
 	});
+var $author$project$IorinParser$foldr = F2(
+	function (pi, pa) {
+		return A2(
+			$author$project$IorinParser$pLog,
+			'foldr',
+			A3(
+				$author$project$IorinParser$concat,
+				$author$project$IorinParser$zeroOrMore(
+					A3(
+						$author$project$IorinParser$concat,
+						pa,
+						pi,
+						F2(
+							function (a, i) {
+								return _Utils_Tuple2(a, i);
+							}))),
+				pa,
+				F2(
+					function (l, a) {
+						return A3(
+							$elm$core$List$foldr,
+							F2(
+								function (_v0, ar) {
+									var al = _v0.a;
+									var i = _v0.b;
+									return A2(i, al, ar);
+								}),
+							a,
+							l);
+					})));
+	});
 var $author$project$IorinParser$concat3 = F4(
 	function (pa, pb, pc, f) {
 		return A2(
@@ -5736,7 +5767,7 @@ function $author$project$Main$cyclic$logExpParser() {
 }
 function $author$project$Main$cyclic$impParser() {
 	return A2(
-		$author$project$IorinParser$foldl,
+		$author$project$IorinParser$foldr,
 		A3(
 			$author$project$IorinParser$concat,
 			$author$project$Main$zeroOrMoreSpaceParser,
