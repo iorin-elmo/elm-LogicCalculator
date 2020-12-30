@@ -197,7 +197,7 @@ update msg model =
           let
             newExpModel =
               { model |
-                result = model.inputStr |> logicExpressionParser
+                result = model.inputStr |> String.replace " " "" |> logicExpressionParser
               }
             newResModel =
               { newExpModel |
